@@ -1,6 +1,6 @@
 const express = require('express');
 const dotenv = require('dotenv');
-const cors = require('cors'); // Import cors
+const cors = require('cors'); 
 const connectDB = require('./config/db');
 const adminRoutes = require('./routes/adminRoutes');
 const dealerRoutes = require('./routes/dealerRoutes');
@@ -12,9 +12,9 @@ const app = express();
 
 // Use CORS middleware
 app.use(cors({
-  origin: 'http://localhost:3000', // Replace with your frontend URL
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Allow these methods
-  allowedHeaders: ['Content-Type', 'Authorization'] // Allow these headers
+  origin: 'https://ims-frontend-six.vercel.app/', 
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], 
+  allowedHeaders: ['Content-Type', 'Authorization'] 
 }));
 
 app.use(express.json());
