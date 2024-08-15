@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const Admin = require('./models/Admin');
 const dotenv = require('dotenv');
 
@@ -30,14 +29,10 @@ async function addAdminUser() {
       return;
     }
 
-    // Hash the password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
     // Create a new admin user
     const newAdmin = new Admin({
       username,
-      password: hashedPassword,
+      password, // No need to hash the password here
     });
 
     // Save the new admin user to the database

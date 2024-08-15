@@ -5,17 +5,30 @@ const generateToken = require('../utils/generateToken');
 // Admin login
 const loginAdmin = async (req, res) => {
     const { username, password } = req.body;
-    const admin = await Admin.findOne({ username });
 
-    if (admin && (await admin.matchPassword(password))) {
-        res.json({
-            _id: admin._id,
-            username: admin.username,
-            role: admin.role,
-            token: generateToken(admin._id),
-        });
-    } else {
-        res.status(401).json({ message: 'Invalid username or password' });
+    // Validate input
+    if (!username || !password) {
+        return res.status(400).json({ message: 'Username and password are required' });
+    }
+
+    try {
+        // Find the admin by username
+        const admin = await Admin.findOne({ username });
+        
+        // Check if admin exists and password matches
+        if (admin && await admin.matchPassword(password)) {
+            res.json({
+                _id: admin._id,
+                username: admin.username,
+                role: admin.role,
+                token: generateToken(admin._id),
+            });
+        } else {
+            res.status(401).json({ message: 'Invalid username or password' });
+        }
+    } catch (err) {
+        console.error('Error during login:', err);
+        res.status(500).json({ message: 'Server error' });
     }
 };
 
