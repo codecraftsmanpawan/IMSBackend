@@ -2,7 +2,7 @@ const express = require('express');
 const { addBrand,updateBrand,  getBrands, addModel, getModels,updateModel, loginDealer, deleteModel, deleteBrand, } = require('../controllers/dealerController');
 const { addStockProduct, getStockProducts, getStockSummary,getStockModelDetails } = require('../controllers/stockProductController');
 const { addSellProduct, getSellProducts } = require('../controllers/sellProductController');
-const {  getPerformanceDataByBrand, getAllBrandPerformance } = require('../controllers/performanceController');
+const {  getPerformanceDataByBrand, getAllBrandPerformance, getAllModelPerformance } = require('../controllers/performanceController');
 const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -49,7 +49,11 @@ router.get('/sell', protect, getSellProducts);
 // Route to get performance data by brand
 router.get('/performance/brand',protect, getPerformanceDataByBrand);
 
+// Route to get overall performance for all Brands
 router.get('/performance/brands',protect, getAllBrandPerformance);
+
+// Route to get overall performance for all models
+router.get('/performance/all/models', getAllModelPerformance); 
 
 // Route to get total sales amount
 router.get('/summary',protect, getStockSummary);

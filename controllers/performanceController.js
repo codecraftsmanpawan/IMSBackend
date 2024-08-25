@@ -223,6 +223,91 @@ const getAllBrandPerformance = async (req, res) => {
     }
 };
 
+// Controller to get performance for all models
+const getAllModelPerformance = async (req, res) => {
+    try {
+        const { period, startDate, endDate } = req.query;
+
+        let start, end;
+        if (startDate && endDate) {
+            start = new Date(startDate);
+            end = new Date(endDate);
+        } else {
+            switch (period) {
+                case 'week':
+                    start = startOfWeek(new Date(), { weekStartsOn: 1 });
+                    end = endOfWeek(new Date(), { weekStartsOn: 1 });
+                    break;
+                case 'month':
+                    start = startOfMonth(new Date());
+                    end = endOfMonth(new Date());
+                    break;
+                case 'quarter':
+                    start = startOfQuarter(new Date());
+                    end = endOfQuarter(new Date());
+                    break;
+                case 'year':
+                    start = startOfYear(new Date());
+                    end = endOfYear(new Date());
+                    break;
+                case 'lifetime':
+                    start = new Date(0);
+                    end = new Date();
+                    break;
+                default:
+                    return res.status(400).json({ message: 'Invalid period specified' });
+            }
+        }
+
+        const performanceData = await SellProduct.aggregate([
+            {
+                $match: {
+                    date: { $gte: start, $lte: end }
+                }
+            },
+            {
+                $group: {
+                    _id: "$modelId",
+                    totalQuantity: { $sum: "$quantity" },
+                    totalAmount: { $sum: "$totalAmount" }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'models',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'modelDetails'
+                }
+            },
+            {
+                $unwind: '$modelDetails'
+            },
+            {
+                $project: {
+                    _id: 0,
+                    modelId: '$_id',
+                    modelName: '$modelDetails.name',
+                    modelPrice: '$modelDetails.price',
+                    totalQuantity: 1,
+                    totalAmount: 1
+                }
+            },
+            {
+                $sort: { totalAmount: -1 }
+            }
+        ]);
+
+        res.status(200).json({
+            startDate: formatISO(start),
+            endDate: formatISO(end),
+            performanceData
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
 
 
-module.exports = { getPerformanceDataByBrand, getAllBrandPerformance };
+
+module.exports = { getPerformanceDataByBrand, getAllBrandPerformance, getAllModelPerformance };
