@@ -4,7 +4,6 @@ const brandSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
-        unique: true,
     },
     dealerId: {
         type: mongoose.Schema.Types.ObjectId,

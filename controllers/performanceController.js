@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const SellProduct = require('../models/SellProduct');
 const Brand = require('../models/Brand'); // Import the Brand model
 const Model = require('../models/Model'); // Import the Model model
+const Dealer = require('../models/Dealer'); // Import the Model model
 const { 
     startOfWeek, endOfWeek, 
     startOfMonth, endOfMonth, 
@@ -10,16 +11,164 @@ const {
     formatISO 
 } = require('date-fns');
 
-const getPerformanceDataByBrand = async (req, res) => {
+// Get all brands according to sales data (total quantity sold, total sales amount)
+const getPerformanceDataByDealer = async (req, res) => {
     try {
-        const { brandId, period, startDate, endDate } = req.query;
+        const { dealerId } = req.query;
 
-        if (!brandId) {
-            return res.status(400).json({ message: 'Brand ID is required' });
+        if (!dealerId) {
+            return res.status(400).json({ message: 'Dealer ID is required' });
         }
+
+        // Perform aggregation to get the total sales per brand for a specific dealer
+        const sellDataByBrand = await SellProduct.aggregate([
+            {
+                $match: {
+                    dealerId: new mongoose.Types.ObjectId(dealerId) // Match the dealerId from the request
+                }
+            },
+            {
+                $group: {
+                    _id: "$brandId", // Group by brandId
+                    totalQuantity: { $sum: "$quantity" }, // Sum the quantity sold for each brand
+                    totalAmount: { $sum: "$totalAmount" } // Sum the total amount for each brand
+                }
+            },
+            {
+                $lookup: {
+                    from: "brands", // Look up the brand details from the Brand collection
+                    localField: "_id", // brandId from SellProduct
+                    foreignField: "_id", // _id in Brand collection
+                    as: "brandDetails"
+                }
+            },
+            {
+                $unwind: "$brandDetails" // Unwind the brandDetails array to get individual objects
+            },
+            {
+                $project: {
+                    _id: 0, // Exclude the _id field from the result
+                    brandId: "$_id", // Include brandId
+                    brandName: "$brandDetails.name", // Include the brand name
+                    totalQuantity: 1, // Include totalQuantity
+                    totalAmount: 1 // Include totalAmount
+                }
+            }
+        ]);
+
+        res.status(200).json(sellDataByBrand);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// controllers/performanceController.js
+const getAllDealerPerformance = async (req, res) => {
+    try {
+        const { period, startDate, endDate } = req.query;
 
         if (period && !['week', 'month', 'quarter', 'year', 'lifetime'].includes(period)) {
             return res.status(400).json({ message: 'Invalid period specified' });
+        }
+
+        let start, end;
+        if (startDate && endDate) {
+            start = new Date(startDate);
+            end = new Date(endDate);
+        } else {
+            switch (period) {
+                case 'week':
+                    start = startOfWeek(new Date(), { weekStartsOn: 1 });
+                    end = endOfWeek(new Date(), { weekStartsOn: 1 });
+                    break;
+                case 'month':
+                    start = startOfMonth(new Date());
+                    end = endOfMonth(new Date());
+                    break;
+                case 'quarter':
+                    start = startOfQuarter(new Date());
+                    end = endOfQuarter(new Date());
+                    break;
+                case 'year':
+                    start = startOfYear(new Date());
+                    end = endOfYear(new Date());
+                    break;
+                case 'lifetime':
+                    start = new Date(0);
+                    end = new Date();
+                    break;
+                default:
+                    return res.status(400).json({ message: 'Invalid period specified' });
+            }
+        }
+
+        const performanceData = await SellProduct.aggregate([
+            {
+                $match: {
+                    date: { $gte: start, $lte: end }
+                }
+            },
+            {
+                $group: {
+                    _id: "$dealerId",
+                    totalQuantity: { $sum: "$quantity" },
+                    totalAmount: { $sum: "$totalAmount" }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'dealers',
+                    localField: '_id',
+                    foreignField: '_id',
+                    as: 'dealerDetails'
+                }
+            },
+            {
+                $unwind: '$dealerDetails'
+            },
+            {
+                $project: {
+                    _id: 0,
+                    dealerId: '$_id',
+                    dealerName: '$dealerDetails.name',
+                    totalQuantity: 1,
+                    totalAmount: 1
+                }
+            },
+            {
+                $sort: { totalAmount: -1 }
+            }
+        ]);
+
+        // Calculate overall totals
+        const overallPerformance = performanceData.reduce((acc, dealer) => {
+            acc.totalQuantity += dealer.totalQuantity;
+            acc.totalAmount += dealer.totalAmount;
+            return acc;
+        }, { totalQuantity: 0, totalAmount: 0 });
+
+        res.status(200).json({
+            startDate: formatISO(start),
+            endDate: formatISO(end),
+            performanceData,
+            overallPerformance
+        });
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+
+// Controller to get performance for all models
+const getAllModelPerformance = async (req, res) => {
+    try {
+        const { dealerId, period, startDate, endDate } = req.query;
+
+        // Validate that dealerId is provided
+        if (!dealerId) {
+            return res.status(400).json({ message: 'Dealer ID is required' });
         }
 
         let start, end;
@@ -53,217 +202,14 @@ const getPerformanceDataByBrand = async (req, res) => {
             }
         }
 
-        console.log('Brand ID:', brandId);
-        console.log('Date Range:', start, end);
+        const matchConditions = {
+            dealerId: new mongoose.Types.ObjectId(dealerId), // Match the dealerId
+            date: { $gte: start, $lte: end }
+        };
 
         const performanceData = await SellProduct.aggregate([
             {
-                $match: {
-                    brandId: new mongoose.Types.ObjectId(brandId), // Use new mongoose.Types.ObjectId()
-                    date: { $gte: start, $lte: end }
-                }
-            },
-            {
-                $group: {
-                    _id: {
-                        brandId: "$brandId",
-                        modelId: "$modelId"
-                    },
-                    totalQuantity: { $sum: "$quantity" },
-                    totalAmount: { $sum: "$totalAmount" }
-                }
-            },
-            {
-                $lookup: {
-                    from: 'brands', // Collection name for brands
-                    localField: '_id.brandId',
-                    foreignField: '_id',
-                    as: 'brandDetails'
-                }
-            },
-            {
-                $unwind: '$brandDetails'
-            },
-            {
-                $lookup: {
-                    from: 'models', // Collection name for models
-                    localField: '_id.modelId',
-                    foreignField: '_id',
-                    as: 'modelDetails'
-                }
-            },
-            {
-                $unwind: '$modelDetails'
-            },
-            {
-                $project: {
-                    _id: 0,
-                    brandId: '$_id.brandId',
-                    modelId: '$_id.modelId',
-                    brandName: '$brandDetails.name',
-                    modelName: '$modelDetails.name',
-                    modelPrice: '$modelDetails.price',
-                    totalQuantity: 1,
-                    totalAmount: 1
-                }
-            },
-            {
-                $sort: { totalQuantity: -1 } // Sort by most sold products
-            }
-        ]);
-
-        console.log('Performance Data by Brand:', performanceData);
-
-        res.status(200).json({
-            brandId,
-            startDate: formatISO(start),
-            endDate: formatISO(end),
-            performanceData
-        });
-    } catch (error) {
-        console.error('Error:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
-};
-
-
-const getAllBrandPerformance = async (req, res) => {
-    try {
-        const { period, startDate, endDate } = req.query;
-
-        if (period && !['week', 'month', 'quarter', 'year', 'lifetime'].includes(period)) {
-            return res.status(400).json({ message: 'Invalid period specified' });
-        }
-
-        let start, end;
-        if (startDate && endDate) {
-            start = new Date(startDate);
-            end = new Date(endDate);
-        } else {
-            switch (period) {
-                case 'week':
-                    start = startOfWeek(new Date(), { weekStartsOn: 1 });
-                    end = endOfWeek(new Date(), { weekStartsOn: 1 });
-                    break;
-                case 'month':
-                    start = startOfMonth(new Date());
-                    end = endOfMonth(new Date());
-                    break;
-                case 'quarter':
-                    start = startOfQuarter(new Date());
-                    end = endOfQuarter(new Date());
-                    break;
-                case 'year':
-                    start = startOfYear(new Date());
-                    end = endOfYear(new Date());
-                    break;
-                case 'lifetime':
-                    start = new Date(0);
-                    end = new Date();
-                    break;
-                default:
-                    return res.status(400).json({ message: 'Invalid period specified' });
-            }
-        }
-
-        const performanceData = await SellProduct.aggregate([
-            {
-                $match: {
-                    date: { $gte: start, $lte: end }
-                }
-            },
-            {
-                $group: {
-                    _id: "$brandId",
-                    totalQuantity: { $sum: "$quantity" },
-                    totalAmount: { $sum: "$totalAmount" }
-                }
-            },
-            {
-                $lookup: {
-                    from: 'brands',
-                    localField: '_id',
-                    foreignField: '_id',
-                    as: 'brandDetails'
-                }
-            },
-            {
-                $unwind: '$brandDetails'
-            },
-            {
-                $project: {
-                    _id: 0,
-                    brandId: '$_id',
-                    brandName: '$brandDetails.name',
-                    totalQuantity: 1,
-                    totalAmount: 1
-                }
-            },
-            {
-                $sort: { totalAmount: -1 }
-            }
-        ]);
-
-        // Calculate overall totals
-        const overallPerformance = performanceData.reduce((acc, brand) => {
-            acc.totalQuantity += brand.totalQuantity;
-            acc.totalAmount += brand.totalAmount;
-            return acc;
-        }, { totalQuantity: 0, totalAmount: 0 });
-
-        res.status(200).json({
-            startDate: formatISO(start),
-            endDate: formatISO(end),
-            performanceData,
-            overallPerformance
-        });
-    } catch (error) {
-        console.error('Error:', error);
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
-};
-
-// Controller to get performance for all models
-const getAllModelPerformance = async (req, res) => {
-    try {
-        const { period, startDate, endDate } = req.query;
-
-        let start, end;
-        if (startDate && endDate) {
-            start = new Date(startDate);
-            end = new Date(endDate);
-        } else {
-            switch (period) {
-                case 'week':
-                    start = startOfWeek(new Date(), { weekStartsOn: 1 });
-                    end = endOfWeek(new Date(), { weekStartsOn: 1 });
-                    break;
-                case 'month':
-                    start = startOfMonth(new Date());
-                    end = endOfMonth(new Date());
-                    break;
-                case 'quarter':
-                    start = startOfQuarter(new Date());
-                    end = endOfQuarter(new Date());
-                    break;
-                case 'year':
-                    start = startOfYear(new Date());
-                    end = endOfYear(new Date());
-                    break;
-                case 'lifetime':
-                    start = new Date(0);
-                    end = new Date();
-                    break;
-                default:
-                    return res.status(400).json({ message: 'Invalid period specified' });
-            }
-        }
-
-        const performanceData = await SellProduct.aggregate([
-            {
-                $match: {
-                    date: { $gte: start, $lte: end }
-                }
+                $match: matchConditions
             },
             {
                 $group: {
@@ -294,7 +240,7 @@ const getAllModelPerformance = async (req, res) => {
                 }
             },
             {
-                $sort: { totalAmount: -1 }
+                $sort: { totalAmount: -1 } // Sort by totalAmount in descending order
             }
         ]);
 
@@ -309,5 +255,4 @@ const getAllModelPerformance = async (req, res) => {
 };
 
 
-
-module.exports = { getPerformanceDataByBrand, getAllBrandPerformance, getAllModelPerformance };
+module.exports = { getPerformanceDataByDealer, getAllDealerPerformance, getAllModelPerformance };

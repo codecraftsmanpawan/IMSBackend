@@ -2,7 +2,7 @@ const express = require('express');
 const { addBrand,updateBrand,  getBrands, addModel, getModels,updateModel, loginDealer, deleteModel, deleteBrand, } = require('../controllers/dealerController');
 const { addStockProduct, getStockProducts, getStockSummary,getStockModelDetails } = require('../controllers/stockProductController');
 const { addSellProduct, getSellProducts } = require('../controllers/sellProductController');
-const {  getPerformanceDataByBrand, getAllBrandPerformance, getAllModelPerformance } = require('../controllers/performanceController');
+const {  getPerformanceDataByDealer, getAllDealerPerformance, getAllModelPerformance } = require('../controllers/performanceController');
 const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -46,15 +46,14 @@ router.post('/sell', protect, addSellProduct);
 // Route to get all sell products for the logged-in dealer
 router.get('/sell', protect, getSellProducts);
 
-// Route to get performance data by brand
-router.get('/performance/brand',protect, getPerformanceDataByBrand);
+// Route to get performance data by dealer ID, aggregated by brand
+router.get('/brand-performance', getPerformanceDataByDealer);
 
-// Route to get overall performance for all Brands
-router.get('/performance/brands',protect, getAllBrandPerformance);
+// Route to get overall performance data for all dealers
+router.get('/performance', getAllDealerPerformance);
 
-// Route to get overall performance for all models
-router.get('/performance/all/models', getAllModelPerformance); 
-
+// Route to get performance data by model, optionally filtered by dealer
+router.get('/model-performance', getAllModelPerformance);
 // Route to get total sales amount
 router.get('/summary',protect, getStockSummary);
 

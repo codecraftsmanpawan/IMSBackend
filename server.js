@@ -5,6 +5,7 @@ const connectDB = require('./config/db');
 const adminRoutes = require('./routes/adminRoutes');
 const dealerRoutes = require('./routes/dealerRoutes');
 
+
 dotenv.config();
 connectDB();
 
@@ -12,9 +13,9 @@ const app = express();
 
 // Use CORS middleware
 app.use(cors({
-  origin: '*', // Allow all origins (not recommended for production)
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: 'http://localhost:3000', 
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], 
+  allowedHeaders: ['Content-Type', 'Authorization'] 
 }));
 
 app.use(express.json());

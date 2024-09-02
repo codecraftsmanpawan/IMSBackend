@@ -59,20 +59,18 @@ const addBrand = async (req, res) => {
             dealerId: req.user._id,
         });
 
-        // Check if the brand was created successfully
-        if (!brand) {
-            return res.status(400).json({ message: 'Failed to create brand' });
-        }
-
         res.status(201).json({
             message: 'Brand added successfully',
             brand,
         });
     } catch (error) {
-        // Handle errors
+        if (error.code === 11000) { // MongoDB unique index error code
+            return res.status(400).json({ message: 'Brand with this name already exists' });
+        }
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
+
 
 // Update brand
 const updateBrand = async (req, res) => {
