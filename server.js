@@ -13,7 +13,11 @@ const app = express();
 
 // Use CORS middleware
 app.use(cors({
+<<<<<<< HEAD
   origin: 'http://localhost:3000', 
+=======
+  origin: 'http://13.234.19.86:3000', 
+>>>>>>> 3ca874a5ea061c57a5324090cd5da5fdaf1c292b
   methods: ['GET', 'POST', 'PUT', 'DELETE'], 
   allowedHeaders: ['Content-Type', 'Authorization'] 
 }));
